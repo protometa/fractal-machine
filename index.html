@@ -1,0 +1,95 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Fractal Machine</title>
+    <script src="/_compile/src/Main.elm"></script>
+  </head>
+  <body>
+    <script type="text/javascript">
+/* global Elm */
+
+// create web audio api context
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+// create Oscillator and gain node
+const oscillator = audioCtx.createOscillator()
+const gainNode = audioCtx.createGain()
+
+const distortion = audioCtx.createWaveShaper()
+
+// grab audio track via XHR for convolver node
+
+// function makeDistortionCurve (amount) {
+//   const k = typeof amount === 'number' ? amount : 50
+//   const nSamples = 44100
+//   const curve = new Float32Array(nSamples)
+//   const deg = Math.PI / 180
+//   let i = 0
+//   let x
+
+//   for (; i < nSamples; ++i) {
+//     x = i * 2 / nSamples - 1
+//     curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x))
+//   }
+//   return curve
+// }
+
+// distortion.curve = makeDistortionCurve(200)
+// distortion.oversample = '8x'
+
+// create an analyser node for our audio
+// var analyser = audioCtx.createAnalyser()
+// analyser.fftSize = 2048
+// We'll track our bufferLength, which will be the same as our fftSize
+// var bufferLength = analyser.fftSize
+// create a Uint8Array to hold analyzer data, of size bufferLength
+// var dataArray = new Uint8Array(bufferLength)
+// connect oscillator to gain node
+oscillator.connect(distortion)
+oscillator.connect(gainNode)
+// distortion.connect(gainNode)
+// connect gain node to analyser
+// gainNode.connect(analyser)
+// connect gain node to speakers
+gainNode.connect(audioCtx.destination)
+
+// We'll set the initial oscillator frequency to 3000 Hertz.
+var initialFreq = 400
+// We'll set the initial volume to 0.001
+var initialVol = 0
+// and we'll set some options for the oscillator
+oscillator.type = 'sine'
+oscillator.frequency.value = initialFreq
+// oscillator.detune.value = 100
+// set options for the gain node
+gainNode.gain.value = initialVol
+
+// We're adding an inbound port in our elm app for the visualization data.
+var app = Elm.Main.fullscreen()
+// We'll make a variable to store our request for an animation frame in,
+// so that we can cancel it conceivably later...though we won't actually bother
+// with that.
+// var drawAnimationFrame
+// Make a quick function to fetch our data.
+// function draw () {
+//   // Request that our function be called next animation frame.
+//   window.requestAnimationFrame(draw)
+//   // fill the data buffer
+//   // analyser.getByteTimeDomainData(dataArray)
+//   // Send it to a 'visualization' port, converting it to an Array of
+//   // integers.
+//   // app.ports.visualization.send(Array.from(dataArray))
+// }
+
+// draw()
+
+app.ports.audio.subscribe(function (model) {
+  console.log(model)
+  gainNode.gain.value = model.on ? model.gain : 0
+  oscillator.frequency.value = model.frequency
+})
+
+oscillator.start()
+    </script>
+  </body>
+</html>
