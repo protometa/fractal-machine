@@ -8,6 +8,7 @@ import Array exposing (Array, fromList, length, get)
 import Maybe exposing (withDefault)
 import Element exposing (..)
 import Element.Input exposing (checkbox)
+import Element.Attributes exposing (..)
 import Style exposing (..)
 
 
@@ -22,12 +23,16 @@ main =
 
 -- MODEL
 
+type alias Measure = Array Float
+
 type alias Model =
   { on : Bool
   , root : Float
-  , beat : Int
+  , tick : Int
   , gain : Float
   , frequency : Float
+  , iterations : List Int
+  , measure : Measure
   }
 
 
@@ -36,10 +41,12 @@ init =
   let
     model = 
       { on = True
-      , root = 400
-      , beat = 0
+      , root = 600
+      , tick = 0
       , gain = 0.8
-      , frequency = root
+      , frequency = 0
+      , iterations = [0, 2, 3]
+      , measure = fromList [1, (2/3), (3/4), (4/5)]
       }
   in
     ( model, sendAudio model )
@@ -52,16 +59,20 @@ type Msg
   | Toggle Bool
 
 
-type alias Measure = Array Float
-measure : Measure
-measure = fromList [1, (2/3), (3/4), (4/5)]
-
 type alias Root = Float
-root = 350
 
-factor beat = 
-  (withDefault 1 (get (beat % (length measure)) measure))
-    * (withDefault 1 (get ((beat // (length measure)) % (length measure)) measure))
+getWithDefault1 arr i = arr |> get i |> withDefault 1
+
+--beat : Int -> Int -> Int
+
+factor tick measure itr =
+  getWithDefault1 measure <| beat tick (length measure) itr
+
+beat tick len itr =
+  tick // (len ^ itr) % len
+
+note tick measure iterations =
+  iterations |> List.map (factor tick measure) |> List.foldr (*) 1
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -69,21 +80,20 @@ update msg model =
 
     Tick newTime ->
       let
-        beat = model.beat + 1
+        tick = model.tick + 1
         newModel =
-          { model | gain = 0.8
-          , beat = beat
-          , frequency = root * (factor beat)
+          { model | tick = tick
+          , frequency = model.root * (note tick model.measure model.iterations)
           }
       in
-        ( newModel, sendAudio newModel )
+        ( newModel, sendAudio model )
 
     Toggle state ->
       let
         newModel =
           { model | on = state }
       in
-        (newModel, sendAudio newModel)
+        (newModel, sendAudio model )
 
 
 
@@ -92,7 +102,7 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
   if model.on then
-    Time.every (750 * millisecond) Tick
+    Time.every (200 * millisecond) Tick
   else
     Sub.none
 
@@ -112,23 +122,21 @@ stylesheet =
 --  row None []
 --    [ button [ onClick Toggle ] [text <| toString model.on]
 --    , input [ type_ "range" ] []
---    , el [] (text <| toString (model.beat % (length measure)))
---    , el [] (text <| toString ((model.beat // (length measure)) % (length measure)))
+--    , el [] (text <| toString (model.tick % (length measure)))
+--    , el [] (text <| toString ((model.tick // (length measure)) % (length measure)))
 --    , el [] (text <| toString model.frequency)
     --]
 
 view model =
-  Element.layout stylesheet <|
-    column None []
+  layout stylesheet <|
+    column None [padding 10, spacing 7]
       [ checkbox None []
         { onChange = Toggle
         , checked = model.on
-        , label = el None [] (text "Playing")
+        , label = el None [] empty
         , options = []
         }
       , el None [] (html <| input [ type_ "range" ] [])
-      , el None [] (text <| toString (model.beat % (length measure)))
-      , el None [] (text <| toString ((model.beat // (length measure)) % (length measure)))
       , el None [] (text <| toString model.frequency)
       ]
 
@@ -137,7 +145,7 @@ sendAudio : Model -> Cmd msg
 sendAudio model =
     audio { frequency = model.frequency, gain = model.gain, on = model.on }
 
-port audio : { frequency : Float, gain : Float, on : Bool} -> Cmd msg
+port audio : { frequency : Float, gain : Float, on : Bool } -> Cmd msg
 port toggle : Bool -> Cmd msg
 
 
